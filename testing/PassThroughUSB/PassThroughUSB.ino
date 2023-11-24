@@ -13,9 +13,6 @@ AudioRecordQueue         queue_recording_right; // Right audio queue for recordi
 
 AudioConnection          patchCord1(usb1, 0, i2s1, 0);
 AudioConnection          patchCord2(usb1, 1, i2s1, 1);
-AudioConnection          patchCord3(usb1, 0, queue_recording_left, 0);
-AudioConnection          patchCord4(usb1, 1, queue_recording_right, 0);
-
 
 AudioControlSGTL5000     sgtl5000_1;     //xy=302,184
 
@@ -26,8 +23,6 @@ void setup() {
 
   // initialize digital pin LED_BUILTIN as an output.
   pinMode(LED_BUILTIN, OUTPUT);
-
-  // queue_recording_right.begin();
 
 }
 
