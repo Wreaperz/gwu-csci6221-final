@@ -10,12 +10,12 @@ AudioRecordQueue         queueRecord;
 AudioPlayQueue           queuePlay;
 
 // AudioInputI2S            i2s1Record;
-AudioInputUSB            usb1;
+AudioInputI2S            i2s1;
 AudioAnalyzePeak         peak1;
 
 //AudioAnalyzePeak         peak2;
 AudioOutputI2S           i2s2Play;
-AudioConnection          patchCord1(usb1, 0, queueRecord, 0);
+AudioConnection          patchCord1(i2s1, 0, queueRecord, 0);
 AudioConnection          patchCord2(queuePlay,  0, i2s2Play, 0);
 AudioConnection          patchCord3(queuePlay,  0, i2s2Play, 1);
 AudioConnection          patchCord4(usb1, 0, peak1, 0);
@@ -68,10 +68,10 @@ void i2s_to_buffer()
 void buffer_to_i2s()
 {
   // Reverse bits in place in the buffer: LOUD AF.
-  // reverseBitsInBuffer(buffer, play_offset, MAX_SAMPLES);
+  reverseBitsInBuffer(buffer, play_offset, MAX_SAMPLES);
 
   // Reverse the order of samples within the block in the buffer
-  reverseBlockInBuffer(buffer, play_offset);
+  // reverseBlockInBuffer(buffer, play_offset);
 
   // Copy the entire block to the play queue
   memcpy(queuePlay.getBuffer(), buffer + play_offset, MAX_SAMPLES * 2);
