@@ -4,24 +4,21 @@
 #include <SD.h>
 #include <SerialFlash.h>
 
-
-// Queues
+// Queues used to record and play data
 AudioRecordQueue         queueRecord;
 AudioPlayQueue           queuePlay;
 
-// AudioInputI2S            i2s1Record;
-AudioInputUSB            usb1;
-AudioAnalyzePeak         peak1;
-
-//AudioAnalyzePeak         peak2;
+AudioInputUSB            usb1; // USE THIS LINE WHEN TESTING AUDIO VIA THE PC (MicroUSB)
+AudioInputI2S            line_in; // USE THIS LINE WHEN TESTING AUDIO VIA THE Condenser Mic
 AudioOutputI2S           i2s2Play;
-AudioConnection          patchCord1(usb1, 0, queueRecord, 0);
-AudioConnection          patchCord2(queuePlay,  0, i2s2Play, 0);
-AudioConnection          patchCord3(queuePlay,  0, i2s2Play, 1);
-AudioConnection          patchCord4(usb1, 0, peak1, 0);
-//AudioConnection          patchCord4(i2s1, 0, peak2, 1);
-// AudioControlSGTL5000     sgtl5000_1;
 
+// Audio connections
+AudioConnection          patchCord1(line_in, 0, queueRecord, 0); // Change "line_in" to "usb1" to use PC audio, vs Condenser Mic
+AudioConnection          patchCord2(queuePlay,  0, i2s2Play, 0); // Left Audio Queue 
+AudioConnection          patchCord3(queuePlay,  0, i2s2Play, 1); // Right Audio Queue 
+
+// Master Audio Controller
+AudioControlSGTL5000     sgtl5000_1;
 
 #define 		MAX_SAMPLES 	128
 #define 		MAX_QUEUE_SIZE  200
@@ -30,32 +27,21 @@ int16_t 		buffer[MAX_SAMPLES * MAX_QUEUE_SIZE];
 int32_t			record_offset = 0;
 int32_t  		play_offset = 0;
 
-
 elapsedMillis 	mymillis;
-
-
-// INPUT     OUTPUT
-// i2s1 L >> i2s2 L
-// i2s1 R >> i2s2 R
 
 void setup()
 {
-  AudioMemory(8);
+  AudioMemory(20);
 
-  // initialize digital pin LED_BUILTIN as an output.
-  pinMode(LED_BUILTIN, OUTPUT);
+  sgtl5000_1.enable();
+  sgtl5000_1.volume(0.8);
+  sgtl5000_1.inputSelect(AUDIO_INPUT_MIC);
+  sgtl5000_1.micGain(40);
 
   queueRecord.begin();
 
   mymillis = 0;
 }
-
-void printPeak()
-{
-	Serial.println(peak1.read());
-	delay(5);
-}
-
 
 void i2s_to_buffer()
 {
@@ -67,9 +53,11 @@ void i2s_to_buffer()
 
 void buffer_to_i2s()
 {
+  // UNCOMMENT THIS BLOCK TO REVERSE BITS AT A TIME
   // Reverse bits in place in the buffer: LOUD AF.
   // reverseBitsInBuffer(buffer, play_offset, MAX_SAMPLES);
 
+  // UNCOMMENT THIS BLOCK TO REVERSE BLOCKS OF AUDIO AT A TIME - still understandable audio, but functional demo
   // Reverse the order of samples within the block in the buffer
   reverseBlockInBuffer(buffer, play_offset);
 
@@ -113,30 +101,13 @@ int16_t reverseBits(int16_t num) {
 
 void loop()
 {
-
-	//printPeak();
-	//delay(1000);
-
 	if(queueRecord.available() >= 2)
 	{
-
-    // digitalWrite(LED_BUILTIN, HIGH);
-    // delay(100);
-    // digitalWrite(LED_BUILTIN, LOW);
-    // delay(100);  
-
 		i2s_to_buffer(); // buffer samples
 
-
-		if (mymillis > 500) //if more than 100ms elapsed from last buffer play
+		if (mymillis > 50) // Decrease this number to make the audio feedback more "real time"
 		{
 			buffer_to_i2s(); //execute last buffered sample
 		}
-
-		//Serial.print(record_offset);
-		//Serial.print(" ");
-		//Serial.print(play_offset);
-		//Serial.println();
-
-	}// end if(queueRecord.available() >= 2)
+	}
 }
