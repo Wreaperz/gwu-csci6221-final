@@ -26,7 +26,8 @@ AudioControlSGTL5000     sgtl5000_1;
 #define 		MAX_QUEUE_SIZE     200
 #define     DRASTIC_THRESHOLD  10000
 #define     WINDOW_SIZE        14
-#define     FENCE_WIDTH        395
+// Assuming 1 128 sample beep, 1 128 sample silence
+#define     FENCE_WIDTH        384
 
 int16_t     scanning_buffer[MAX_SAMPLES];
 

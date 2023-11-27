@@ -32,14 +32,18 @@ AudioControlSGTL5000     sgtl5000_1;
 
 
 int16_t     scanning_buffer[MAX_SAMPLES];
-int16_t     processing_buffer[MAX_SAMPLES * 10];
+int16_t     processing_buffer[MAX_SAMPLES * AUDIO_PACKET_NUM];
+
+// Current length of processing buffer
+int processing_buffer_max_len = MAX_SAMPLES * AUDIO_PACKET_NUM;
+int processing_buffer_len = 0;
 
 // Distance from previous increase to current location
 int prev_fence_start_dist = -100;
 // Distance from current location to fence end
 int fence_end_dist = -100;
 
-
+bool processing_fence = true;
 bool fence_start_found = false;
 
 
@@ -118,30 +122,76 @@ void sendSerialNumToPC(int num) {
 
 void loop()
 {
-  // If fence_start_not_found. Need to look for fence start in scanning buffer
-  if (!fence_start_found) {
-    if (queueRecord.available() >= 1)
+  // If processing fence, we are either looking for fence start, or traversing start to end.
+  if (processing_fence) {
+    // Data must be available to do anything
+    if (queueRecord.available() >= 1) 
     {
-      // Move data to scanning buffer
-      i2s_to_scanning_buffer();
-      // Scan buffer for fence_start
-      int fence_start_index = scan_buffer_for_start_of_fence(scanning_buffer);
-      // Check if found
-      if (fence_start_found) {
-        // Output distance between current fence_post_start and previous if not the first
-        if (prev_fence_start_dist >= 0) {
-          sendSerialNumToPC(prev_fence_start_dist);
+      // We are currently scanning for fence start
+      if (!fence_start_found) {
+        // Move data to scanning buffer
+        i2s_to_scanning_buffer();
+        // Scan buffer for fence_start
+        int fence_start_index = scan_buffer_for_start_of_fence(scanning_buffer);
+        // Check if found
+        if (fence_start_found) {
+          // Reset prev_fence_start_dist to remaining samples in buffer to simulate further iteration
+          prev_fence_start_dist = MAX_SAMPLES - fence_start_index;
         }
-        // Reset prev_fence_start_dist to remaining samples in buffer to simulate further iteration
-        prev_fence_start_dist = MAX_SAMPLES - fence_start_index;
+      }
+      // We have found the fence start and are traversing until the end.
+      else {
+        // Check traversal distance to fence end
+        int traversal_distance = FENCE_WIDTH - prev_fence_start_dist;
 
-        // Set fence_start_found to false and repeat
-        fence_start_found = false;
+        // If traversal distance is too great. Skip processing any values
+        if traversal_distance > MAX_SAMPLES {
+          int16_t* input_queue_pointer = queueRecord.readBuffer();
+          // Free the memory
+          queueRecord.freeBuffer();
+          // Add the distance traversed
+          prev_fence_start_dist += MAX_SAMPLES;
+        }
+        // Fence end is within the next audio block
+        else {
+          // Signal the fence traversal is complete
+          processing_fence = false;
+
+          // Transfer data to scanning buffer
+          i2s_to_scanning_buffer();
+
+          // Copy leftover samples to processing buffer
+          int samples_to_copy = MAX_SAMPLES - traversal_distance;
+          int start_copy_index = traversal_distance;
+          memcpy(processing_buffer + processing_buffer_len, scanning_buffer + start_copy_index, samples_to_copy * sizeof(int16_t));
+
+          // Update processing buffer length
+          processing_buffer_len += samples_to_copy;
+        }
       }
     }
   }
   else {
-    Serial.println("PROGRAM AINT WORKIN");
-    delay(100);
+    // Process the remaining data. 
+    // We will need to add somewhere between 9 and 10 packets worth of data to the processing buffer.
+    if (queueRecord.available() >= AUDIO_PACKET_NUM) {
+      // Calculate samples to copy over
+      int remaining_samples = processing_buffer_max_len - processing_buffer_len;
+      // Calculate number of full packets that can fit into processing buffer
+      int full_packets_to_insert = remaining_samples / MAX_SAMPLES;
+      // Copy over the full packets
+      for (int i = 0; i < full_packets_to_insert; i++) {
+        memcpy(processing_buffer + processing_buffer_len, queueRecord.readBuffer(), MAX_SAMPLES * 2);
+        queueRecord.freeBuffer();
+        processing_buffer_len += MAX_SAMPLES;
+      }
+      // One partial packet of data to copy into processing_buffer
+      remaining_samples = processing_buffer_max_len - processing_buffer_len;
+      // Copy full packet into scanning buffer as intermediary
+      i2s_to_scanning_buffer();
+      // Copy up until last remaining sample into processing buffer. Processing buffer should now be full.
+      memcpy(processing_buffer + processing_buffer_len, scanning_buffer, remaining_samples * 2);
+      // Traverse until fence end: Dont worry about for now.
+    }
   }
 }
