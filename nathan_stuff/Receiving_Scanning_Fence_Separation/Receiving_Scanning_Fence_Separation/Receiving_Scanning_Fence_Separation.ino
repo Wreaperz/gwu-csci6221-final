@@ -119,7 +119,8 @@ void sendSerialNumToPC(int num) {
 void loop()
 {
   // If fence_start_not_found. Need to look for fence start in scanning buffer
-  if (!fence_start_found) {
+  if (!fence_start_found) 
+  {
     if (queueRecord.available() >= 1)
     {
       // Move data to scanning buffer
@@ -142,6 +143,6 @@ void loop()
   }
   else {
     Serial.println("PROGRAM AINT WORKIN");
-    delay(100)
+    delay(100);
   }
 }
