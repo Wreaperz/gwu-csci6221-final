@@ -30,15 +30,22 @@ int16_t buffer[MAX_SAMPLES * MAX_QUEUE_SIZE];
 int32_t record_offset = 0;
 int32_t play_offset = 0;
 
+int16_t globalMin = INT16_MAX; // Initialize to the maximum possible value of int16_t
+int16_t globalMax = INT16_MIN; // Initialize to the minimum possible value of int16_t
+
+
 elapsedMillis mymillis;
 
 void setup() {
+
+  Serial.begin(115200); // Initialize serial communication at 115200 baud rate
+
   AudioMemory(20);
 
   sgtl5000_1.enable();
   sgtl5000_1.volume(0.8);
-  sgtl5000_1.inputSelect(AUDIO_INPUT_LINEIN); // Select line-in as the audio source
-  sgtl5000_1.micGain(40);
+  // sgtl5000_1.inputSelect(AUDIO_INPUT_LINEIN); // Select line-in as the audio source
+  // sgtl5000_1.micGain(40);
 
   queueRecord.begin();
   lowpassFilter.setLowpass(0, 2500); // Example cutoff frequency at 1500 Hz
@@ -55,8 +62,14 @@ void line_in_to_buffer() {
 void buffer_to_i2s() {
   unsigned long scrambleKey = 123456789; // Use the same key as in the transmitter
 
+  // Print buffer before descrambling
+  printBufferContents(" Pre-Descramble", buffer, play_offset, MAX_SAMPLES);
+
   // Descramble the audio data
   //descrambleBlockInBuffer(buffer, play_offset, scrambleKey);
+
+  // Print buffer after descrambling
+  printBufferContents("Post-Descramble", buffer, play_offset, MAX_SAMPLES);
 
   // Play the descrambled audio
   memcpy(queuePlay.getBuffer(), buffer + play_offset, MAX_SAMPLES * 2);
@@ -87,6 +100,16 @@ void descrambleBlockInBuffer(int16_t* buffer, int startIndex, unsigned long key)
         buffer[startIndex + indices[j]] = buffer[startIndex + indices[i]];
         buffer[startIndex + indices[i]] = temp;
     }
+}
+
+void printBufferContents(const char* label, int16_t* buffer, int startIndex, int count) {
+    Serial.print(label);
+    Serial.print(": ");
+    for (int i = 0; i < count; ++i) {
+        Serial.print(buffer[startIndex + i]);
+        Serial.print(" ");
+    }
+    Serial.println();
 }
 
 void loop() {

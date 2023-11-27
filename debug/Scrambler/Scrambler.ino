@@ -32,6 +32,7 @@ elapsedMillis 	mymillis;
 
 void setup()
 {
+  Serial.begin(115200); // Initialize serial communication at 115200 baud rate
   AudioMemory(20);
 
   sgtl5000_1.enable();
@@ -50,6 +51,7 @@ void i2s_to_buffer()
 	queueRecord.freeBuffer();
 	record_offset+=MAX_SAMPLES;
 	if (record_offset >= (MAX_SAMPLES * MAX_QUEUE_SIZE))	record_offset=0;
+  //printBufferContents("Recorded Buffer", buffer, record_offset - MAX_SAMPLES, MAX_SAMPLES); // Debugging
 }
 
 void buffer_to_i2s()
@@ -64,9 +66,15 @@ void buffer_to_i2s()
   // Reverse the order of samples within the block in the buffer
   //reverseBlockInBuffer(buffer, play_offset);
 
+  // Print buffer before scrambling
+  printBufferContents(" Pre-Scramble", buffer, play_offset, MAX_SAMPLES);
+
   scrambleBlockInBuffer(buffer, play_offset, scrambleKey);
   descrambleBlockInBuffer(buffer, play_offset, scrambleKey);
   
+  // Print buffer after scrambling
+  printBufferContents("Post-Scramble", buffer, play_offset, MAX_SAMPLES);
+
   // Copy the entire block to the play queue
   memcpy(queuePlay.getBuffer(), buffer + play_offset, MAX_SAMPLES * 2);
   queuePlay.playBuffer();
@@ -144,15 +152,21 @@ int16_t reverseBits(int16_t num) {
     return reverse_num;
 }
 
+void printBufferContents(const char* label, int16_t* buffer, int startIndex, int count) {
+    Serial.print(label);
+    Serial.print(": ");
+    for (int i = 0; i < count; ++i) {
+        Serial.print(buffer[startIndex + i]);
+        Serial.print(" ");
+    }
+    Serial.println();
+}
+
 void loop()
 {
 	if(queueRecord.available() >= 2)
 	{
 		i2s_to_buffer(); // buffer samples
-
-		if (mymillis > 500) // Decrease this number to make the audio feedback more "real time"
-		{
-			buffer_to_i2s(); //execute last buffered sample
-		}
+    buffer_to_i2s();
 	}
 }
